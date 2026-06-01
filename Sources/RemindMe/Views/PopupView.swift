@@ -12,11 +12,11 @@ struct PopupView: View {
     var body: some View {
         VStack(spacing: Space.sm) {
             header
-            AddTaskField()
             Divider()
             taskList
             Divider()
             footer
+            AddTaskField()
         }
         .padding(Space.md)
         .frame(width: 340)

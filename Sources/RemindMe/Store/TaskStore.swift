@@ -7,7 +7,10 @@ final class TaskStore: ObservableObject {
     @Published private(set) var archive: [RTask] = []
 
     private(set) var folderURL: URL
-    private var fileURL: URL { folderURL.appendingPathComponent("data.json") }
+    static let fileName = "RemindMe.json"
+    static let legacyFileName = "data.json"
+    private var fileURL: URL { folderURL.appendingPathComponent(Self.fileName) }
+    private var legacyFileURL: URL { folderURL.appendingPathComponent(Self.legacyFileName) }
 
     private var saveTimer: Timer?
     private var archiveTimer: Timer?
@@ -15,6 +18,7 @@ final class TaskStore: ObservableObject {
     init(folderURL: URL) {
         self.folderURL = folderURL
         try? FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+        migrateLegacyFileIfNeeded()
         load()
         rolloverCompletedToArchive()
         pruneArchive()
@@ -126,7 +130,7 @@ final class TaskStore: ObservableObject {
         guard newFolder != folderURL else { return true }
         let fm = FileManager.default
         try? fm.createDirectory(at: newFolder, withIntermediateDirectories: true)
-        let destination = newFolder.appendingPathComponent("data.json")
+        let destination = newFolder.appendingPathComponent(Self.fileName)
         let source = fileURL
         do {
             if fm.fileExists(atPath: destination.path) { try fm.removeItem(at: destination) }
@@ -149,6 +153,17 @@ final class TaskStore: ObservableObject {
     private struct Persisted: Codable {
         var tasks: [RTask]
         var archive: [RTask]
+    }
+
+    private func migrateLegacyFileIfNeeded() {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: legacyFileURL.path),
+              !fm.fileExists(atPath: fileURL.path) else { return }
+        do {
+            try fm.moveItem(at: legacyFileURL, to: fileURL)
+        } catch {
+            NSLog("Remind.me legacy migration error: \(error)")
+        }
     }
 
     private func load() {
