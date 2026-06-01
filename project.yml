@@ -19,7 +19,6 @@ targets:
         CFBundleDisplayName: Remind.me
         CFBundleShortVersionString: "0.1.0"
         CFBundleVersion: "1"
-        LSUIElement: true
         LSMinimumSystemVersion: "14.0"
         NSHumanReadableCopyright: "© 2026 Ferdinando Olivieri"
     settings:

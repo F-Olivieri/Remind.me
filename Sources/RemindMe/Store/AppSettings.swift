@@ -18,10 +18,14 @@ final class AppSettings: ObservableObject {
             UserDefaults.standard.set(true, forKey: key)
         }
         self.showDockIcon = UserDefaults.standard.bool(forKey: key)
-        applyActivationPolicy()
     }
 
     func applyActivationPolicy() {
-        NSApp.setActivationPolicy(showDockIcon ? .regular : .accessory)
+        let target: NSApplication.ActivationPolicy = showDockIcon ? .regular : .accessory
+        guard NSApp.activationPolicy() != target else { return }
+        NSApp.setActivationPolicy(target)
+        if target == .regular {
+            NSApp.activate(ignoringOtherApps: true)
+        }
     }
 }
