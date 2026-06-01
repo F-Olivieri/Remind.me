@@ -4,6 +4,7 @@ import AppKit
 struct PopupView: View {
     @EnvironmentObject var store: TaskStore
     @EnvironmentObject var windowController: FloatingWindowController
+    @EnvironmentObject var settings: AppSettings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showArchive = false
 
@@ -44,6 +45,10 @@ struct PopupView: View {
 
             Menu {
                 Button("Show Archive…") { showArchive = true }
+                Divider()
+                Section("Settings") {
+                    Toggle("Show Dock Icon", isOn: $settings.showDockIcon)
+                }
                 Divider()
                 Button("Quit Remind.me") { NSApp.terminate(nil) }
             } label: {
