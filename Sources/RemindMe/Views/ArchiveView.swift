@@ -57,6 +57,7 @@ struct ArchiveView: View {
         HStack(spacing: Space.sm) {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.secondary)
+                .help("Completed task")
             VStack(alignment: .leading, spacing: 1) {
                 Text(t.title).font(.body)
                 if let ca = t.completedAt {

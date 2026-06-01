@@ -35,6 +35,7 @@ struct TaskRow: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(Color.rmUrgent)
                     .font(.caption)
+                    .help("Urgent — pinned to top")
                     .accessibilityHidden(true)
             }
 
@@ -77,6 +78,7 @@ struct TaskRow: View {
                 .font(.system(size: 18, weight: .regular))
         }
         .buttonStyle(.plain)
+        .help(task.isComplete ? "Mark as not completed" : "Mark as completed")
         .accessibilityLabel(task.isComplete ? "Completed" : "Not completed")
         .accessibilityValue(task.title)
         .accessibilityHint("Double-tap to toggle completion")
@@ -106,6 +108,7 @@ struct TaskRow: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
+        .help("Task actions: pin urgent, edit, delete")
         .accessibilityLabel("Task actions")
     }
 

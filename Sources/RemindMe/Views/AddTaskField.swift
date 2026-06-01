@@ -11,6 +11,7 @@ struct AddTaskField: View {
         HStack(spacing: Space.xs + 2) {
             Image(systemName: "plus")
                 .foregroundStyle(.secondary)
+                .help("Type a task and press Return to add. Hold ⇧ for urgent.")
             TextField("Add a task… (⇧⏎ for urgent)", text: $text)
                 .textFieldStyle(.plain)
                 .font(.body)
@@ -23,7 +24,7 @@ struct AddTaskField: View {
                     .foregroundStyle(urgent ? AnyShapeStyle(Color.rmUrgent) : AnyShapeStyle(HierarchicalShapeStyle.secondary))
             }
             .buttonStyle(.plain)
-            .help("Mark next task as urgent")
+            .help(urgent ? "Next task will be urgent — click to undo" : "Mark next task as urgent (pinned to top)")
             .accessibilityLabel(urgent ? "Urgent, on" : "Mark urgent")
             .accessibilityHint("Pins this task to the top")
         }

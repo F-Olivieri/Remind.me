@@ -58,6 +58,7 @@ struct PopupView: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
+            .help("Archive, settings, quit")
             .accessibilityLabel("Menu")
         }
     }
