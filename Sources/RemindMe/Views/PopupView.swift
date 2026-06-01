@@ -6,8 +6,14 @@ struct PopupView: View {
     @EnvironmentObject var pinController: PinController
     @EnvironmentObject var settings: AppSettings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.openWindow) private var openWindow
     @State private var showArchive = false
     @State private var showSettings = false
+
+    /// True when this view is hosted inside the menu-bar popover; flips the
+    /// pin behaviour to dismiss the popover and open the floating window
+    /// instead of toggling pin state in-place.
+    var inMenuBar: Bool = false
 
     var body: some View {
         VStack(spacing: Space.sm) {
@@ -37,8 +43,12 @@ struct PopupView: View {
             Text("Remind.me").font(.headline)
             Spacer()
             Button {
-                withAnimation(Motion.respecting(reduceMotion, Motion.window)) {
-                    pinController.togglePin()
+                if inMenuBar {
+                    pinController.pinFromMenuBar { openWindow(id: $0) }
+                } else {
+                    withAnimation(Motion.respecting(reduceMotion, Motion.window)) {
+                        pinController.togglePin()
+                    }
                 }
             } label: {
                 Image(systemName: pinController.isPinned ? "pin.fill" : "pin")

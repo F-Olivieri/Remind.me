@@ -34,7 +34,7 @@ struct RemindMeApp: App {
         .windowResizability(.contentSize)
 
         MenuBarExtra {
-            PopupView()
+            PopupView(inMenuBar: true)
                 .environmentObject(store)
                 .environmentObject(pinController)
                 .environmentObject(settings)
