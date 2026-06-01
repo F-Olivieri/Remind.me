@@ -4,32 +4,43 @@ import AppKit
 @main
 struct RemindMeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @StateObject private var store = TaskStore()
-    @StateObject private var windowController = FloatingWindowController()
-    @StateObject private var settings = AppSettings()
+    @StateObject private var settings: AppSettings
+    @StateObject private var store: TaskStore
+    @StateObject private var pinController = PinController()
+
+    init() {
+        let s = AppSettings()
+        let t = TaskStore(folderURL: s.dbFolderURL)
+        // When the user picks a new folder, move the database there.
+        s.onDbFolderChange = { [weak t] newURL in
+            _ = t?.relocate(to: newURL)
+        }
+        // When retention changes, prune immediately.
+        s.onRetentionChange = { [weak t] _ in
+            t?.pruneArchive()
+        }
+        _settings = StateObject(wrappedValue: s)
+        _store = StateObject(wrappedValue: t)
+    }
 
     var body: some Scene {
         WindowGroup("Remind.me", id: "main") {
             PopupView()
                 .environmentObject(store)
-                .environmentObject(windowController)
+                .environmentObject(pinController)
                 .environmentObject(settings)
-                .onAppear {
-                    windowController.attach(store: store, settings: settings)
-                    settings.applyActivationPolicy()
-                }
+                .onAppear { settings.applyActivationPolicy() }
         }
         .windowResizability(.contentSize)
 
         MenuBarExtra {
             PopupView()
                 .environmentObject(store)
-                .environmentObject(windowController)
+                .environmentObject(pinController)
                 .environmentObject(settings)
-                .onAppear { windowController.attach(store: store, settings: settings) }
         } label: {
-            Image("MenuBarGlyph")
-                .renderingMode(.template)
+            // SF Symbol → guaranteed visible template render in any menu bar.
+            Image(systemName: "checklist")
         }
         .menuBarExtraStyle(.window)
     }
@@ -37,7 +48,7 @@ struct RemindMeApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let shouldShowDock = UserDefaults.standard.object(forKey: "showDockIcon") as? Bool ?? true
+        let shouldShowDock = UserDefaults.standard.object(forKey: AppSettings.dockKey) as? Bool ?? true
         NSApp.setActivationPolicy(shouldShowDock ? .regular : .accessory)
         if shouldShowDock {
             NSApp.activate(ignoringOtherApps: true)

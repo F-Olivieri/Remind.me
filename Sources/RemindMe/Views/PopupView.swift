@@ -3,10 +3,11 @@ import AppKit
 
 struct PopupView: View {
     @EnvironmentObject var store: TaskStore
-    @EnvironmentObject var windowController: FloatingWindowController
+    @EnvironmentObject var pinController: PinController
     @EnvironmentObject var settings: AppSettings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showArchive = false
+    @State private var showSettings = false
 
     var body: some View {
         VStack(spacing: Space.sm) {
@@ -24,6 +25,11 @@ struct PopupView: View {
             ArchiveView(isPresented: $showArchive)
                 .environmentObject(store)
         }
+        .sheet(isPresented: $showSettings) {
+            SettingsView(isPresented: $showSettings)
+                .environmentObject(settings)
+                .environmentObject(store)
+        }
     }
 
     private var header: some View {
@@ -32,23 +38,21 @@ struct PopupView: View {
             Spacer()
             Button {
                 withAnimation(Motion.respecting(reduceMotion, Motion.window)) {
-                    windowController.toggle()
+                    pinController.togglePin()
                 }
             } label: {
-                Image(systemName: windowController.isOpen ? "pin.fill" : "pin")
-                    .foregroundStyle(windowController.isOpen ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(HierarchicalShapeStyle.secondary))
+                Image(systemName: pinController.isPinned ? "pin.fill" : "pin")
+                    .foregroundStyle(pinController.isPinned ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(HierarchicalShapeStyle.secondary))
             }
             .buttonStyle(.plain)
-            .help(windowController.isOpen ? "Unpin window" : "Keep on screen")
-            .accessibilityLabel(windowController.isOpen ? "Unpin window" : "Keep on screen")
-            .accessibilityHint(windowController.isOpen ? "Returns to the menu bar" : "Detaches as a floating window")
+            .help(pinController.isPinned ? "Unpin — return to normal stacking" : "Keep on top of every other window")
+            .accessibilityLabel(pinController.isPinned ? "Unpin window" : "Keep on top")
+            .accessibilityHint(pinController.isPinned ? "Returns to normal window stacking" : "Pins this window above all other apps")
 
             Menu {
                 Button("Show Archive…") { showArchive = true }
                 Divider()
-                Section("Settings") {
-                    Toggle("Show Dock Icon", isOn: $settings.showDockIcon)
-                }
+                Button("Settings…") { showSettings = true }
                 Divider()
                 Button("Quit Remind.me") { NSApp.terminate(nil) }
             } label: {

@@ -6,25 +6,22 @@ final class TaskStore: ObservableObject {
     @Published private(set) var tasks: [RTask] = []
     @Published private(set) var archive: [RTask] = []
 
-    private let fileURL: URL
+    private(set) var folderURL: URL
+    private var fileURL: URL { folderURL.appendingPathComponent("data.json") }
+
     private var saveTimer: Timer?
     private var archiveTimer: Timer?
 
-    init() {
-        let fm = FileManager.default
-        let base = try! fm.url(for: .applicationSupportDirectory,
-                               in: .userDomainMask,
-                               appropriateFor: nil,
-                               create: true)
-            .appendingPathComponent("Remind.me", isDirectory: true)
-        try? fm.createDirectory(at: base, withIntermediateDirectories: true)
-        self.fileURL = base.appendingPathComponent("data.json")
+    init(folderURL: URL) {
+        self.folderURL = folderURL
+        try? FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
         load()
         rolloverCompletedToArchive()
-        scheduleArchiveSweep()
+        pruneArchive()
+        scheduleSweep()
     }
 
-    // MARK: - Active tasks, sorted for UI
+    // MARK: - Visible / sorted
 
     var visibleTasks: [RTask] {
         tasks.sorted { a, b in
@@ -54,13 +51,8 @@ final class TaskStore: ObservableObject {
         scheduleSave()
     }
 
-    func toggleComplete(_ id: UUID) {
-        update(id) { $0.setComplete(!$0.isComplete) }
-    }
-
-    func toggleUrgent(_ id: UUID) {
-        update(id) { $0.isUrgent.toggle() }
-    }
+    func toggleComplete(_ id: UUID) { update(id) { $0.setComplete(!$0.isComplete) } }
+    func toggleUrgent(_ id: UUID)   { update(id) { $0.isUrgent.toggle() } }
 
     func rename(_ id: UUID, to title: String) {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -86,12 +78,10 @@ final class TaskStore: ObservableObject {
         scheduleSave()
     }
 
-    // MARK: - Archive rollover
+    // MARK: - Archive rollover & retention
 
-    /// Move tasks completed before the start of today into archive.
     func rolloverCompletedToArchive(now: Date = Date()) {
-        let cal = Calendar.current
-        let startOfToday = cal.startOfDay(for: now)
+        let startOfToday = Calendar.current.startOfDay(for: now)
         var moved: [RTask] = []
         tasks.removeAll { t in
             guard t.isComplete, let ca = t.completedAt else { return false }
@@ -107,11 +97,50 @@ final class TaskStore: ObservableObject {
         }
     }
 
-    private func scheduleArchiveSweep() {
-        // Sweep every 10 minutes (covers day rollover for a long-running app).
+    /// Retention from UserDefaults: 0 = unlimited; otherwise prune archive entries
+    /// whose completedAt is older than `retentionDays`.
+    func pruneArchive(now: Date = Date()) {
+        let days = UserDefaults.standard.integer(forKey: AppSettings.retentionKey)
+        guard days > 0 else { return }
+        let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: now) ?? now
+        let before = archive.count
+        archive.removeAll { ($0.completedAt ?? .distantFuture) < cutoff }
+        if archive.count != before { scheduleSave() }
+    }
+
+    private func scheduleSweep() {
         archiveTimer?.invalidate()
         archiveTimer = Timer.scheduledTimer(withTimeInterval: 600, repeats: true) { [weak self] _ in
-            DispatchQueue.main.async { self?.rolloverCompletedToArchive() }
+            DispatchQueue.main.async {
+                self?.rolloverCompletedToArchive()
+                self?.pruneArchive()
+            }
+        }
+    }
+
+    // MARK: - Folder relocation
+
+    /// Moves the database to a new folder. On success the new folder becomes authoritative.
+    @discardableResult
+    func relocate(to newFolder: URL) -> Bool {
+        guard newFolder != folderURL else { return true }
+        let fm = FileManager.default
+        try? fm.createDirectory(at: newFolder, withIntermediateDirectories: true)
+        let destination = newFolder.appendingPathComponent("data.json")
+        let source = fileURL
+        do {
+            if fm.fileExists(atPath: destination.path) { try fm.removeItem(at: destination) }
+            if fm.fileExists(atPath: source.path) {
+                try fm.moveItem(at: source, to: destination)
+            } else {
+                // Nothing to move; write the current in-memory state to the new location.
+                try writeAtomically(to: destination)
+            }
+            folderURL = newFolder
+            return true
+        } catch {
+            NSLog("Remind.me relocate error: \(error)")
+            return false
         }
     }
 
@@ -139,14 +168,15 @@ final class TaskStore: ObservableObject {
     }
 
     private func save() {
+        do { try writeAtomically(to: fileURL) }
+        catch { NSLog("Remind.me save error: \(error)") }
+    }
+
+    private func writeAtomically(to url: URL) throws {
         let payload = Persisted(tasks: tasks, archive: archive)
-        do {
-            let enc = JSONEncoder()
-            enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let data = try enc.encode(payload)
-            try data.write(to: fileURL, options: .atomic)
-        } catch {
-            NSLog("Remind.me save error: \(error)")
-        }
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try enc.encode(payload)
+        try data.write(to: url, options: .atomic)
     }
 }
