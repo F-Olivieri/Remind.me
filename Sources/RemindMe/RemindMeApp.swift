@@ -15,7 +15,7 @@ struct RemindMeApp: App {
                 .environmentObject(windowController)
                 .environmentObject(settings)
                 .onAppear {
-                    windowController.attach(store: store)
+                    windowController.attach(store: store, settings: settings)
                     settings.applyActivationPolicy()
                 }
         }
@@ -26,7 +26,7 @@ struct RemindMeApp: App {
                 .environmentObject(store)
                 .environmentObject(windowController)
                 .environmentObject(settings)
-                .onAppear { windowController.attach(store: store) }
+                .onAppear { windowController.attach(store: store, settings: settings) }
         } label: {
             Image("MenuBarGlyph")
                 .renderingMode(.template)

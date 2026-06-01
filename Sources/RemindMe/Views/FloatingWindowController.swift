@@ -6,9 +6,11 @@ final class FloatingWindowController: ObservableObject {
     @Published private(set) var isOpen = false
     private var window: NSWindow?
     private weak var store: TaskStore?
+    private weak var settings: AppSettings?
 
-    func attach(store: TaskStore) {
+    func attach(store: TaskStore, settings: AppSettings) {
         self.store = store
+        self.settings = settings
     }
 
     func toggle() {
@@ -16,7 +18,7 @@ final class FloatingWindowController: ObservableObject {
     }
 
     func open() {
-        guard let store else { return }
+        guard let store, let settings else { return }
         if let w = window {
             w.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
@@ -26,6 +28,7 @@ final class FloatingWindowController: ObservableObject {
         let delegate = FloatingWindowDelegate()
         let root = PopupView()
             .environmentObject(store)
+            .environmentObject(settings)
             .environmentObject(self)
             .background(FloatingWindowChrome())
         let host = NSHostingController(rootView: root)
