@@ -12,7 +12,8 @@ struct RemindMeApp: App {
                 .environmentObject(windowController)
                 .onAppear { windowController.attach(store: store) }
         } label: {
-            Image(systemName: "checklist")
+            Image("MenuBarGlyph")
+                .renderingMode(.template)
         }
         .menuBarExtraStyle(.window)
     }

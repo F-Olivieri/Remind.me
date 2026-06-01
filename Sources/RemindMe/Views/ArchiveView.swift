@@ -5,7 +5,7 @@ struct ArchiveView: View {
     @Binding var isPresented: Bool
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Space.sm) {
             HStack {
                 Text("Archive").font(.headline)
                 Spacer()
@@ -14,13 +14,19 @@ struct ArchiveView: View {
             }
             Divider()
             if store.archive.isEmpty {
-                Text("Archive is empty")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 160)
+                VStack(spacing: Space.xs) {
+                    Image(systemName: "tray")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.secondary.opacity(0.5))
+                    Text("Archive is empty")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 200)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 2) {
-                        ForEach(store.archive.sorted(by: { ($0.completedAt ?? .distantPast) > ($1.completedAt ?? .distantPast) })) { t in
+                    LazyVStack(spacing: 3) {
+                        ForEach(sortedArchive) { t in
                             archiveRow(t)
                         }
                     }
@@ -36,17 +42,23 @@ struct ArchiveView: View {
                 .disabled(store.archive.isEmpty)
             }
         }
-        .padding(12)
+        .padding(Space.md)
         .frame(width: 380, height: 460)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: Radius.sheet, style: .continuous))
+    }
+
+    private var sortedArchive: [RTask] {
+        store.archive.sorted { ($0.completedAt ?? .distantPast) > ($1.completedAt ?? .distantPast) }
     }
 
     @ViewBuilder
     private func archiveRow(_ t: RTask) -> some View {
-        HStack {
+        HStack(spacing: Space.sm) {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 1) {
-                Text(t.title)
+                Text(t.title).font(.body)
                 if let ca = t.completedAt {
                     Text(ca, style: .date)
                         .font(.caption2)
@@ -64,8 +76,13 @@ struct ArchiveView: View {
                 Image(systemName: "trash").foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
+            .help("Delete forever")
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 6)
+        .padding(.vertical, Space.xs)
+        .padding(.horizontal, Space.sm - 2)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.row, style: .continuous)
+                .fill(Color.primary.opacity(0.04))
+        )
     }
 }
