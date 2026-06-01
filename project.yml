@@ -11,8 +11,7 @@ targets:
     platform: macOS
     sources:
       - path: Sources/RemindMe
-    resources:
-      - path: Resources
+      - path: Resources/Assets.xcassets
     info:
       path: Resources/Info.plist
       properties:
