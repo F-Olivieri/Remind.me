@@ -9,7 +9,7 @@ struct RemindMeApp: App {
     @StateObject private var settings = AppSettings()
 
     var body: some Scene {
-        MenuBarExtra {
+        WindowGroup("Remind.me", id: "main") {
             PopupView()
                 .environmentObject(store)
                 .environmentObject(windowController)
@@ -18,20 +18,20 @@ struct RemindMeApp: App {
                     windowController.attach(store: store)
                     settings.applyActivationPolicy()
                 }
-        } label: {
-            Image("MenuBarGlyph")
-                .renderingMode(.template)
         }
-        .menuBarExtraStyle(.window)
+        .windowResizability(.contentSize)
 
-        Window("Remind.me", id: "main") {
+        MenuBarExtra {
             PopupView()
                 .environmentObject(store)
                 .environmentObject(windowController)
                 .environmentObject(settings)
                 .onAppear { windowController.attach(store: store) }
+        } label: {
+            Image("MenuBarGlyph")
+                .renderingMode(.template)
         }
-        .windowResizability(.contentSize)
+        .menuBarExtraStyle(.window)
     }
 }
 
@@ -48,7 +48,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !flag {
             for w in NSApp.windows where w.title == "Remind.me" {
                 w.makeKeyAndOrderFront(nil)
-                return true
+                NSApp.activate(ignoringOtherApps: true)
+                return false
             }
         }
         return true
