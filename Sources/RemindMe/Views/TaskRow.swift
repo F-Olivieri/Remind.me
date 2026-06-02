@@ -20,6 +20,11 @@ struct TaskRow: View {
                     .font(.body)
                     .focused($focused)
                     .onExitCommand { editing = false }
+                    .onChange(of: focused) { _, isFocused in
+                        if !isFocused && editing {
+                            commit()
+                        }
+                    }
             } else {
                 Text(task.title)
                     .font(.body)

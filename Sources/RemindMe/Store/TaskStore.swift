@@ -12,14 +12,15 @@ final class TaskStore: ObservableObject {
     private var fileURL: URL { folderURL.appendingPathComponent(Self.fileName) }
     private var legacyFileURL: URL { folderURL.appendingPathComponent(Self.legacyFileName) }
 
-    private var saveTimer: Timer?
-    private var archiveTimer: Timer?
+    private let saveSubject = PassthroughSubject<Void, Never>()
+    private var cancellables = Set<AnyCancellable>()
 
     init(folderURL: URL) {
-        self.folderURL = folderURL
+        self.folderURL = folderURL.standardized
         try? FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
         migrateLegacyFileIfNeeded()
         load()
+        setupSaveDebounce()
         rolloverCompletedToArchive()
         pruneArchive()
         scheduleSweep()
@@ -88,9 +89,15 @@ final class TaskStore: ObservableObject {
         let startOfToday = Calendar.current.startOfDay(for: now)
         var moved: [RTask] = []
         tasks.removeAll { t in
-            guard t.isComplete, let ca = t.completedAt else { return false }
+            guard t.isComplete else { return false }
+            // Handle legacy/conflict tasks where completedAt is missing but isComplete is true
+            let ca = t.completedAt ?? t.createdAt
             if ca < startOfToday {
-                moved.append(t)
+                var updatedTask = t
+                if updatedTask.completedAt == nil {
+                    updatedTask.completedAt = ca
+                }
+                moved.append(updatedTask)
                 return true
             }
             return false
@@ -113,13 +120,13 @@ final class TaskStore: ObservableObject {
     }
 
     private func scheduleSweep() {
-        archiveTimer?.invalidate()
-        archiveTimer = Timer.scheduledTimer(withTimeInterval: 600, repeats: true) { [weak self] _ in
-            DispatchQueue.main.async {
+        Timer.publish(every: 600, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
                 self?.rolloverCompletedToArchive()
                 self?.pruneArchive()
             }
-        }
+            .store(in: &cancellables)
     }
 
     // MARK: - Folder relocation
@@ -127,20 +134,30 @@ final class TaskStore: ObservableObject {
     /// Moves the database to a new folder. On success the new folder becomes authoritative.
     @discardableResult
     func relocate(to newFolder: URL) -> Bool {
-        guard newFolder != folderURL else { return true }
+        let canonicalNew = newFolder.resolvingSymlinksInPath().standardized
+        let canonicalCurrent = folderURL.resolvingSymlinksInPath().standardized
+        guard canonicalNew != canonicalCurrent else { return true }
+
         let fm = FileManager.default
-        try? fm.createDirectory(at: newFolder, withIntermediateDirectories: true)
-        let destination = newFolder.appendingPathComponent(Self.fileName)
+        try? fm.createDirectory(at: canonicalNew, withIntermediateDirectories: true)
+        let destination = canonicalNew.appendingPathComponent(Self.fileName)
         let source = fileURL
         do {
-            if fm.fileExists(atPath: destination.path) { try fm.removeItem(at: destination) }
+            if fm.fileExists(atPath: destination.path) {
+                // Ensure we don't accidentally remove the source if they refer to the same folder via a hard/soft link
+                guard destination.resolvingSymlinksInPath().standardized != source.resolvingSymlinksInPath().standardized else {
+                    folderURL = canonicalNew
+                    return true
+                }
+                try fm.removeItem(at: destination)
+            }
             if fm.fileExists(atPath: source.path) {
                 try fm.moveItem(at: source, to: destination)
             } else {
                 // Nothing to move; write the current in-memory state to the new location.
                 try writeAtomically(to: destination)
             }
-            folderURL = newFolder
+            folderURL = canonicalNew
             return true
         } catch {
             NSLog("Remind.me relocate error: \(error)")
@@ -175,11 +192,17 @@ final class TaskStore: ObservableObject {
         self.archive = decoded.archive
     }
 
+    private func setupSaveDebounce() {
+        saveSubject
+            .debounce(for: .seconds(0.4), scheduler: RunLoop.main)
+            .sink { [weak self] in
+                self?.save()
+            }
+            .store(in: &cancellables)
+    }
+
     private func scheduleSave() {
-        saveTimer?.invalidate()
-        saveTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: false) { [weak self] _ in
-            DispatchQueue.main.async { self?.save() }
-        }
+        saveSubject.send()
     }
 
     private func save() {

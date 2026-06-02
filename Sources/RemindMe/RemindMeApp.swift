@@ -4,23 +4,14 @@ import AppKit
 @main
 struct RemindMeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @StateObject private var settings: AppSettings
+    @StateObject private var settings = AppSettings()
     @StateObject private var store: TaskStore
+
     @StateObject private var pinController = PinController()
 
     init() {
         let s = AppSettings()
-        let t = TaskStore(folderURL: s.dbFolderURL)
-        // When the user picks a new folder, move the database there.
-        s.onDbFolderChange = { [weak t] newURL in
-            _ = t?.relocate(to: newURL)
-        }
-        // When retention changes, prune immediately.
-        s.onRetentionChange = { [weak t] _ in
-            t?.pruneArchive()
-        }
-        _settings = StateObject(wrappedValue: s)
-        _store = StateObject(wrappedValue: t)
+        _store = StateObject(wrappedValue: TaskStore(folderURL: s.dbFolderURL))
     }
 
     var body: some Scene {
@@ -29,7 +20,16 @@ struct RemindMeApp: App {
                 .environmentObject(store)
                 .environmentObject(pinController)
                 .environmentObject(settings)
-                .onAppear { settings.applyActivationPolicy() }
+                .onAppear {
+                    settings.applyActivationPolicy()
+                    // Wire up store actions when settings change
+                    settings.onDbFolderChange = { [weak store] newURL in
+                        _ = store?.relocate(to: newURL)
+                    }
+                    settings.onRetentionChange = { [weak store] _ in
+                        store?.pruneArchive()
+                    }
+                }
         }
         .windowResizability(.contentSize)
 
@@ -38,6 +38,14 @@ struct RemindMeApp: App {
                 .environmentObject(store)
                 .environmentObject(pinController)
                 .environmentObject(settings)
+                .onAppear {
+                    settings.onDbFolderChange = { [weak store] newURL in
+                        _ = store?.relocate(to: newURL)
+                    }
+                    settings.onRetentionChange = { [weak store] _ in
+                        store?.pruneArchive()
+                    }
+                }
         } label: {
             // SF Symbol → guaranteed visible template render in any menu bar.
             Image(systemName: "checklist")
