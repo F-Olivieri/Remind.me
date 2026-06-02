@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/app-icon.png" alt="Remind.me icon" width="128" height="128">
+</p>
+
 # Remind.me
 
 Tiny, calm macOS app for short-lived tasks. Menu bar + Dock, pin on top, archives overnight, plain-JSON storage.
