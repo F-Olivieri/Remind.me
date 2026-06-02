@@ -4,12 +4,6 @@ Tiny, calm macOS app for short-lived tasks. Menu bar + Dock, pin on top, archive
 
 > macOS 14+ · SwiftUI
 
-## Screenshots
-
-| Popup | Pinned | Settings |
-|---|---|---|
-| ![popup](docs/screenshots/popup.png) | ![pinned](docs/screenshots/pinned.png) | ![settings](docs/screenshots/settings.png) |
-
 ## Install
 
 Download `Remind.me-<version>.dmg` from [Releases](../../releases), open it, drag **Remind.me** to `/Applications`.
