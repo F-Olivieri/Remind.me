@@ -13,13 +13,13 @@ cd "$ROOT"
 VERSION="$(awk -F'"' '/CFBundleShortVersionString/{print $2; exit}' project.yml)"
 VERSION="${VERSION:-0.0.0}"
 
-BUILD_DIR="$ROOT/build"
+DERIVED_DATA_DIR="$ROOT/DerivedData"
 DIST_DIR="$ROOT/dist"
 APP_NAME="Remind.me"
-APP_BUNDLE="$BUILD_DIR/Build/Products/Release/${APP_NAME}.app"
+APP_BUNDLE="$DERIVED_DATA_DIR/Build/Products/Release/${APP_NAME}.app"
 DMG_NAME="Remind.me-${VERSION}.dmg"
 DMG_PATH="$DIST_DIR/$DMG_NAME"
-STAGING="$BUILD_DIR/dmg-staging"
+STAGING="$DERIVED_DATA_DIR/dmg-staging"
 
 echo "▸ Generating Xcode project"
 xcodegen generate
@@ -28,11 +28,11 @@ echo "▸ Building Release"
 xcodebuild -project RemindMe.xcodeproj \
   -scheme RemindMe \
   -configuration Release \
-  -derivedDataPath "$BUILD_DIR" \
+  -derivedDataPath "$DERIVED_DATA_DIR" \
   clean build | xcpretty || xcodebuild -project RemindMe.xcodeproj \
   -scheme RemindMe \
   -configuration Release \
-  -derivedDataPath "$BUILD_DIR" \
+  -derivedDataPath "$DERIVED_DATA_DIR" \
   clean build
 
 if [[ ! -d "$APP_BUNDLE" ]]; then

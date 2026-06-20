@@ -3,7 +3,11 @@ FO-Architecture.mdx
 dist/
 build/
 DerivedData/
-*.xcodeproj/
+# xcodeproj is xcodegen-generated; ignore the regenerated/user bits but keep the
+# shared workspace settings (WorkspaceSettings.xcsettings) tracked.
+*.xcodeproj/project.pbxproj
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
 !project.yml
 .swiftpm/
 .build/
