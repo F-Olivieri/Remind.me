@@ -5,6 +5,7 @@ import Combine
 final class TaskStore: ObservableObject {
     @Published private(set) var tasks: [RTask] = []
     @Published private(set) var archive: [RTask] = []
+    @Published private(set) var categoryRecords: [TaskCategory] = []
 
     private(set) var folderURL: URL
     static let fileName = "RemindMe.json"
@@ -29,6 +30,29 @@ final class TaskStore: ObservableObject {
     // MARK: - Visible / sorted
 
     var visibleTasks: [RTask] {
+        sorted(tasks)
+    }
+
+    var categories: [String] {
+        categoryRecords
+            .sorted { a, b in
+                if a.sortOrder != b.sortOrder { return a.sortOrder < b.sortOrder }
+                return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+            }
+            .map(\.name)
+    }
+
+    func visibleTasks(in category: String?) -> [RTask] {
+        let normalized = normalizedCategory(category)
+        guard let normalized else { return visibleTasks }
+        return sorted(tasks.filter { normalizedCategory($0.category) == normalized })
+    }
+
+    func openCount(in category: String?) -> Int {
+        visibleTasks(in: category).filter { !$0.isComplete }.count
+    }
+
+    private func sorted(_ tasks: [RTask]) -> [RTask] {
         tasks.sorted { a, b in
             if a.isUrgent != b.isUrgent { return a.isUrgent && !b.isUrgent }
             if a.isComplete != b.isComplete { return !a.isComplete && b.isComplete }
@@ -38,10 +62,12 @@ final class TaskStore: ObservableObject {
 
     // MARK: - Mutations
 
-    func add(title: String, urgent: Bool = false) {
+    func add(title: String, urgent: Bool = false, category: String? = nil) {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        tasks.append(RTask(title: trimmed, isUrgent: urgent))
+        let normalized = normalizedCategory(category)
+        ensureCategoryExists(normalized)
+        tasks.append(RTask(title: trimmed, isUrgent: urgent, category: normalized))
         scheduleSave()
     }
 
@@ -58,6 +84,12 @@ final class TaskStore: ObservableObject {
 
     func toggleComplete(_ id: UUID) { update(id) { $0.setComplete(!$0.isComplete) } }
     func toggleUrgent(_ id: UUID)   { update(id) { $0.isUrgent.toggle() } }
+
+    func setCategory(_ id: UUID, to category: String?) {
+        let normalized = normalizedCategory(category)
+        ensureCategoryExists(normalized)
+        update(id) { $0.category = normalized }
+    }
 
     func rename(_ id: UUID, to title: String) {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -81,6 +113,58 @@ final class TaskStore: ObservableObject {
     func clearArchive() {
         archive.removeAll()
         scheduleSave()
+    }
+
+    @discardableResult
+    func addCategory(_ name: String) -> Bool {
+        guard let normalized = normalizedCategory(name),
+              !categoryRecords.contains(where: { sameCategory($0.name, normalized) }) else { return false }
+        categoryRecords.append(TaskCategory(name: normalized, sortOrder: categoryRecords.count))
+        scheduleSave()
+        return true
+    }
+
+    func renameCategory(_ id: UUID, to name: String) {
+        guard let normalized = normalizedCategory(name),
+              let idx = categoryRecords.firstIndex(where: { $0.id == id }) else { return }
+        let oldName = categoryRecords[idx].name
+        guard !sameCategory(oldName, normalized) else { return }
+        guard !categoryRecords.contains(where: { $0.id != id && sameCategory($0.name, normalized) }) else { return }
+
+        categoryRecords[idx].name = normalized
+        updateTaskCategories(from: oldName, to: normalized)
+        scheduleSave()
+    }
+
+    func deleteCategory(_ id: UUID) {
+        guard let idx = categoryRecords.firstIndex(where: { $0.id == id }) else { return }
+        let oldName = categoryRecords.remove(at: idx).name
+        updateTaskCategories(from: oldName, to: nil)
+        scheduleSave()
+    }
+
+    func normalizedCategory(_ category: String?) -> String? {
+        guard let trimmed = category?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else { return nil }
+        return trimmed
+    }
+
+    private func ensureCategoryExists(_ category: String?) {
+        guard let category, !categoryRecords.contains(where: { sameCategory($0.name, category) }) else { return }
+        categoryRecords.append(TaskCategory(name: category, sortOrder: categoryRecords.count))
+    }
+
+    private func sameCategory(_ lhs: String, _ rhs: String) -> Bool {
+        lhs.caseInsensitiveCompare(rhs) == .orderedSame
+    }
+
+    private func updateTaskCategories(from oldName: String, to newName: String?) {
+        for idx in tasks.indices where normalizedCategory(tasks[idx].category).map({ sameCategory($0, oldName) }) == true {
+            tasks[idx].category = newName
+        }
+        for idx in archive.indices where normalizedCategory(archive[idx].category).map({ sameCategory($0, oldName) }) == true {
+            archive[idx].category = newName
+        }
     }
 
     // MARK: - Archive rollover & retention
@@ -170,6 +254,7 @@ final class TaskStore: ObservableObject {
     private struct Persisted: Codable {
         var tasks: [RTask]
         var archive: [RTask]
+        var categories: [TaskCategory]?
     }
 
     private func migrateLegacyFileIfNeeded() {
@@ -190,6 +275,10 @@ final class TaskStore: ObservableObject {
         }
         self.tasks = decoded.tasks
         self.archive = decoded.archive
+        self.categoryRecords = decoded.categories ?? deriveCategories(from: decoded.tasks + decoded.archive)
+        if decoded.categories == nil && !categoryRecords.isEmpty {
+            try? writeAtomically(to: fileURL)
+        }
     }
 
     private func setupSaveDebounce() {
@@ -211,10 +300,18 @@ final class TaskStore: ObservableObject {
     }
 
     private func writeAtomically(to url: URL) throws {
-        let payload = Persisted(tasks: tasks, archive: archive)
+        let payload = Persisted(tasks: tasks, archive: archive, categories: categoryRecords)
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try enc.encode(payload)
         try data.write(to: url, options: .atomic)
+    }
+
+    private func deriveCategories(from tasks: [RTask]) -> [TaskCategory] {
+        let names = Array(Set(tasks.compactMap { normalizedCategory($0.category) }))
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        return names.enumerated().map { idx, name in
+            TaskCategory(name: name, sortOrder: idx)
+        }
     }
 }

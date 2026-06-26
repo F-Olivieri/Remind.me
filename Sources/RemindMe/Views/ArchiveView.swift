@@ -60,6 +60,12 @@ struct ArchiveView: View {
                 .help("Completed task")
             VStack(alignment: .leading, spacing: 1) {
                 Text(t.title).font(.body)
+                if let category = t.category {
+                    Text(category)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
                 if let ca = t.completedAt {
                     Text(ca, style: .date)
                         .font(.caption2)

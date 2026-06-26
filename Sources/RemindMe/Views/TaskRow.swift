@@ -14,24 +14,33 @@ struct TaskRow: View {
         HStack(spacing: Space.sm) {
             checkbox
 
-            if editing {
-                TextField("", text: $draft, onCommit: commit)
-                    .textFieldStyle(.plain)
-                    .font(.body)
-                    .focused($focused)
-                    .onExitCommand { editing = false }
-                    .onChange(of: focused) { _, isFocused in
-                        if !isFocused && editing {
-                            commit()
+            VStack(alignment: .leading, spacing: 2) {
+                if editing {
+                    TextField("", text: $draft, onCommit: commit)
+                        .textFieldStyle(.plain)
+                        .font(.body)
+                        .focused($focused)
+                        .onExitCommand { editing = false }
+                        .onChange(of: focused) { _, isFocused in
+                            if !isFocused && editing {
+                                commit()
+                            }
                         }
-                    }
-            } else {
-                Text(task.title)
-                    .font(.body)
-                    .strikethrough(task.isComplete, color: .secondary)
-                    .foregroundStyle(task.isComplete ? AnyShapeStyle(HierarchicalShapeStyle.secondary) : AnyShapeStyle(HierarchicalShapeStyle.primary))
-                    .lineLimit(2)
-                    .onTapGesture(count: 2) { startEdit() }
+                } else {
+                    Text(task.title)
+                        .font(.body)
+                        .strikethrough(task.isComplete, color: .secondary)
+                        .foregroundStyle(task.isComplete ? AnyShapeStyle(HierarchicalShapeStyle.secondary) : AnyShapeStyle(HierarchicalShapeStyle.primary))
+                        .lineLimit(2)
+                        .onTapGesture(count: 2) { startEdit() }
+                }
+
+                if let category = task.category {
+                    Text(category)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
 
             Spacer(minLength: 4)
@@ -98,6 +107,19 @@ struct TaskRow: View {
                 }
             }
             Button("Edit") { startEdit() }
+            if !store.categories.isEmpty {
+                Menu("Category") {
+                    Button("No Category") {
+                        store.setCategory(task.id, to: nil)
+                    }
+                    Divider()
+                    ForEach(store.categories, id: \.self) { category in
+                        Button(category) {
+                            store.setCategory(task.id, to: category)
+                        }
+                    }
+                }
+            }
             Divider()
             Button("Delete", role: .destructive) {
                 withAnimation(Motion.respecting(reduceMotion, Motion.settle)) {

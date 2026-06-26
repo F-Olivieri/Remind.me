@@ -9,6 +9,7 @@ struct PopupView: View {
     @Environment(\.openWindow) private var openWindow
     @State private var showArchive = false
     @State private var showSettings = false
+    @State private var selectedCategory: String? = nil
 
     /// True when this view is hosted inside the menu-bar popover; flips the
     /// pin behaviour to dismiss the popover and open the floating window
@@ -16,17 +17,36 @@ struct PopupView: View {
     var inMenuBar: Bool = false
 
     var body: some View {
-        VStack(spacing: Space.sm) {
-            header
-            Divider()
-            taskList
-            Divider()
-            footer
-            AddTaskField()
+        Group {
+            if settings.captureBarEnabled && !inMenuBar {
+                AddTaskField(selectedCategory: selectedCategory, compact: true)
+                    .environmentObject(settings)
+                    .frame(width: 560)
+            } else {
+                VStack(spacing: Space.sm) {
+                    header
+                    categoryBar
+                    Divider()
+                    taskList
+                    Divider()
+                    footer
+                    AddTaskField(selectedCategory: selectedCategory)
+                }
+                .padding(Space.md)
+                .frame(width: 340)
+                .frame(minHeight: 240)
+            }
         }
-        .padding(Space.md)
-        .frame(width: 340)
-        .frame(minHeight: 240)
+        .onChange(of: settings.captureBarEnabled) { _, visible in
+            if !inMenuBar {
+                pinController.setCaptureBarVisible(visible)
+            }
+        }
+        .onAppear {
+            if !inMenuBar {
+                pinController.setCaptureBarVisible(settings.captureBarEnabled)
+            }
+        }
         .sheet(isPresented: $showArchive) {
             ArchiveView(isPresented: $showArchive)
                 .environmentObject(store)
@@ -61,6 +81,9 @@ struct PopupView: View {
 
             Menu {
                 Button("Show Archive…") { showArchive = true }
+                Button(settings.captureBarEnabled ? "Hide Capture Bar" : "Show Capture Bar") {
+                    settings.captureBarEnabled.toggle()
+                }
                 Divider()
                 Button("Settings…") { showSettings = true }
                 Divider()
@@ -79,12 +102,12 @@ struct PopupView: View {
 
     private var taskList: some View {
         Group {
-            if store.visibleTasks.isEmpty {
+            if filteredTasks.isEmpty {
                 emptyState
             } else {
                 ScrollView {
                     LazyVStack(spacing: 3) {
-                        ForEach(store.visibleTasks) { t in
+                        ForEach(filteredTasks) { t in
                             TaskRow(task: t)
                                 .transition(.asymmetric(
                                     insertion: .opacity.combined(with: .scale(scale: 0.98, anchor: .top)),
@@ -92,9 +115,55 @@ struct PopupView: View {
                                 ))
                         }
                     }
-                    .animation(Motion.respecting(reduceMotion, Motion.settle), value: store.visibleTasks)
+                    .animation(Motion.respecting(reduceMotion, Motion.settle), value: filteredTasks)
                 }
                 .frame(maxHeight: 360)
+            }
+        }
+    }
+
+    private var filteredTasks: [RTask] {
+        store.visibleTasks(in: selectedCategory)
+    }
+
+    @ViewBuilder
+    private var categoryBar: some View {
+        if !store.categories.isEmpty {
+            HStack(spacing: Space.xs) {
+                Image(systemName: "folder")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                Menu {
+                    Button("All Categories") { selectedCategory = nil }
+                    Divider()
+                    ForEach(store.categories, id: \.self) { category in
+                        Button(category) { selectedCategory = category }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(selectedCategory ?? "All Categories")
+                            .font(.caption)
+                            .lineLimit(1)
+                        Image(systemName: "chevron.down")
+                            .font(.caption2)
+                    }
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("Filter by category")
+                Spacer()
+                if selectedCategory != nil {
+                    Button {
+                        selectedCategory = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Clear category filter")
+                    .accessibilityLabel("Clear category filter")
+                }
             }
         }
     }
@@ -116,7 +185,7 @@ struct PopupView: View {
 
     private var footer: some View {
         HStack {
-            let remaining = store.tasks.filter { !$0.isComplete }.count
+            let remaining = store.openCount(in: selectedCategory)
             Text("\(remaining) open")
                 .font(.caption)
                 .foregroundStyle(.secondary)

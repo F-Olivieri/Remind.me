@@ -7,6 +7,8 @@ final class AppSettings: ObservableObject {
     static let retentionKey  = "archiveRetentionDays"      // 0 = unlimited
     static let dbFolderKey   = "dbFolderBookmark"          // Data (security-scoped bookmark)
     static let dbFolderPathKey = "dbFolderPath"            // String (display + fallback)
+    static let captureBarKey = "captureBarEnabled"
+    static let captureDraftKey = "captureDraft"
 
     @Published var showDockIcon: Bool {
         didSet {
@@ -30,6 +32,12 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    @Published var captureBarEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(captureBarEnabled, forKey: Self.captureBarKey)
+        }
+    }
+
     /// Closures wired by the app at launch so this store stays decoupled.
     var onDbFolderChange: ((URL) -> Void)?
     var onRetentionChange: ((Int) -> Void)?
@@ -38,9 +46,11 @@ final class AppSettings: ObservableObject {
         let d = UserDefaults.standard
         if d.object(forKey: Self.dockKey) == nil { d.set(true, forKey: Self.dockKey) }
         if d.object(forKey: Self.retentionKey) == nil { d.set(0, forKey: Self.retentionKey) }
+        if d.object(forKey: Self.captureBarKey) == nil { d.set(true, forKey: Self.captureBarKey) }
         self.showDockIcon = d.bool(forKey: Self.dockKey)
         self.retentionDays = d.integer(forKey: Self.retentionKey)
         self.dbFolderURL = AppSettings.resolveDbFolder()
+        self.captureBarEnabled = d.bool(forKey: Self.captureBarKey)
     }
 
     // MARK: - Activation policy

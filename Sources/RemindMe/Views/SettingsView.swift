@@ -8,6 +8,7 @@ struct SettingsView: View {
 
     @State private var retentionChoice: RetentionChoice = .unlimited
     @State private var customDays: Int = 7
+    @State private var newCategoryName = ""
 
     var body: some View {
         VStack(spacing: Space.md) {
@@ -42,6 +43,27 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("Categories") {
+                    HStack {
+                        TextField("New category", text: $newCategoryName)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit { addCategory() }
+                        Button("Add") { addCategory() }
+                            .disabled(newCategoryName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+
+                    if store.categoryRecords.isEmpty {
+                        Text("No categories")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(store.categoryRecords) { category in
+                            CategoryEditorRow(category: category)
+                                .environmentObject(store)
+                        }
+                    }
+                }
+
                 Section("Archive retention") {
                     Picker("Keep completed tasks for", selection: $retentionChoice) {
                         Text("1 day").tag(RetentionChoice.oneDay)
@@ -72,7 +94,7 @@ struct SettingsView: View {
             .formStyle(.grouped)
         }
         .padding(Space.md)
-        .frame(width: 460, height: 460)
+        .frame(width: 500, height: 560)
         .onAppear { loadRetentionFromSettings() }
     }
 
@@ -121,5 +143,61 @@ struct SettingsView: View {
         let defaultURL = AppSettings.defaultDbFolder()
         settings.dbFolderURL = defaultURL
         UserDefaults.standard.removeObject(forKey: AppSettings.dbFolderKey)
+    }
+
+    private func addCategory() {
+        if store.addCategory(newCategoryName) {
+            newCategoryName = ""
+        }
+    }
+}
+
+private struct CategoryEditorRow: View {
+    @EnvironmentObject var store: TaskStore
+    let category: TaskCategory
+    @State private var draft: String
+    @FocusState private var focused: Bool
+
+    init(category: TaskCategory) {
+        self.category = category
+        _draft = State(initialValue: category.name)
+    }
+
+    var body: some View {
+        HStack {
+            TextField("Category", text: $draft)
+                .textFieldStyle(.roundedBorder)
+                .focused($focused)
+                .onSubmit { commit() }
+                .onChange(of: focused) { _, isFocused in
+                    if !isFocused { commit() }
+                }
+                .onChange(of: category.name) { _, name in
+                    draft = name
+                }
+
+            Button {
+                commit()
+            } label: {
+                Image(systemName: "checkmark")
+            }
+            .buttonStyle(.plain)
+            .help("Rename category")
+            .accessibilityLabel("Rename category")
+
+            Button(role: .destructive) {
+                store.deleteCategory(category.id)
+            } label: {
+                Image(systemName: "trash")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Delete category and remove it from tasks")
+            .accessibilityLabel("Delete category")
+        }
+    }
+
+    private func commit() {
+        store.renameCategory(category.id, to: draft)
     }
 }
