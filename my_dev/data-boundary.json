@@ -1,0 +1,17 @@
+{
+  "$schema": "https://atelier.local/schemas/data-boundary-v1.json",
+  "schemaVersion": 1,
+  "project": "remind-me",
+  "state": "stateful",
+  "hardcodedDataPolicy": "schema-defaults-and-synthetic-fixtures-only",
+  "models": [
+    {
+      "id": "task-library",
+      "description": "Active tasks, archive entries, capture draft, retention, and database-location preferences.",
+      "sensitivity": ["personal", "private"],
+      "authority": { "kind": "application-support", "name": "Remind.me application-support JSON database" },
+      "modelPaths": ["Sources/RemindMe/Models/Task.swift"],
+      "adapterPaths": ["Sources/RemindMe/Store/TaskStore.swift", "Sources/RemindMe/Store/AppSettings.swift"]
+    }
+  ]
+}
