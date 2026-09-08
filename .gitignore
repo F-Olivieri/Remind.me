@@ -14,3 +14,6 @@ DerivedData/
 *.xcuserstate
 xcuserdata/
 *.xcworkspace/xcuserdata/
+
+# External Atelier evidence/work compatibility link.
+/my_dev/.work
