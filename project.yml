@@ -17,15 +17,13 @@ targets:
       properties:
         CFBundleName: Remind.me
         CFBundleDisplayName: Remind.me
-        CFBundleShortVersionString: "0.1.0"
-        CFBundleVersion: "1"
         LSMinimumSystemVersion: "14.0"
         NSHumanReadableCopyright: "© 2026 Ferdinando Olivieri"
+    scheme: {}
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.folivieri.RemindMe
         PRODUCT_NAME: "Remind.me"
-        MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
